@@ -1,0 +1,14 @@
+[project]
+name = "ai-service"
+version = "0.1.0"
+description = "Backend service to generate captions and images from LLMs"
+authors = [{ name = "Avi Mehta" }]
+requires-python = ">=3.9"
+
+dependencies = [
+    "flask>=2.3.0",
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.30.0"
+]
+

@@ -1,0 +1,7 @@
+name: AI Integration
+type: module
+description: Integration with AI backend to generate ad captions and images
+core_version_requirement: ^10 || ^11
+package: Custom
+dependencies:
+  - node

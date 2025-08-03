@@ -1,0 +1,89 @@
+<?php
+
+use Drupal\node\Entity\Node;
+use Drupal\media\Entity\Media;
+use Drupal\file\Entity\File;
+use Drupal\Core\Entity\EntityInterface;
+
+/**
+ * Implements hook_entity_insert().
+ */
+function ai_integration_entity_insert(EntityInterface $entity) {
+  // Only trigger on 'prompt_submission' content type.
+  if ($entity->getEntityTypeId() === 'node' && $entity->bundle() === 'prompt_submission') {
+    $prompt_text = trim($entity->get('field_prompt')->value);
+
+    // Validate prompt
+    if (empty($prompt_text)) {
+      \Drupal::logger('ai_integration')->error('Prompt is empty. Cannot proceed with AI generation.');
+      $entity->set('field_status', 'failed')->save();
+      return;
+    }
+
+    try {
+      // Make HTTP POST request to Flask backend
+      $client = \Drupal::httpClient();
+      $response = $client->post('http://host.docker.internal:5000/generate', [
+        'json' => ['prompt' => $prompt_text],
+        'headers' => ['Content-Type' => 'application/json'],
+        'timeout' => 30, // increased timeout for long generation
+      ]);
+
+      $data = json_decode($response->getBody(), TRUE);
+      \Drupal::logger('ai_integration')->notice('AI response: @response', ['@response' => print_r($data, TRUE)]);
+
+      $caption = $data['caption'] ?? '';
+      $image_url = $data['image_path'] ?? '';
+
+      if (empty($image_url)) {
+        \Drupal::logger('ai_integration')->error('Image URL is empty. Prompt: @prompt', ['@prompt' => $prompt_text]);
+        $entity->set('field_status', 'failed')->save();
+        return;
+      }
+
+      // Download image file and save using Drupal 10+ method
+      $image_data = file_get_contents($image_url);
+      if ($image_data === false) {
+        throw new \Exception('Failed to download image from URL: ' . $image_url);
+      }
+
+      $filename = basename($image_url);
+      $file_path = 'public://' . $filename;
+      $file_system = \Drupal::service('file_system');
+      $saved_path = $file_system->saveData($image_data, $file_path, FileSystemInterface::EXISTS_RENAME);
+
+      $file = File::create(['uri' => $saved_path]);
+      $file->save();
+
+      // Create Media entity for image
+      $media = Media::create([
+        'bundle' => 'image',
+        'name' => 'AI Generated Image - ' . $filename,
+        'field_media_image' => [
+          'target_id' => $file->id(),
+          'alt' => 'Generated ad image',
+        ],
+        'status' => 1,
+      ]);
+      $media->save();
+
+      // Create Generated Creative node
+      $creative = Node::create([
+        'type' => 'generated_creative',
+        'title' => substr($caption ?: $prompt_text, 0, 50),
+        'field_caption' => $caption,
+        'field_ai_image' => ['target_id' => $media->id()],
+        'field_prompt_ref' => ['target_id' => $entity->id()],
+        'field_approval_status' => 'draft',
+      ]);
+      $creative->save();
+
+      // Update original prompt node status to 'generated'
+      $entity->set('field_status', 'generated')->save();
+
+    } catch (\Exception $e) {
+      \Drupal::logger('ai_integration')->error('AI generation failed: @msg', ['@msg' => $e->getMessage()]);
+      $entity->set('field_status', 'failed')->save();
+    }
+  }
+}

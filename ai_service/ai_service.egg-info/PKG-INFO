@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: ai-service
+Version: 0.1.0
+Summary: Backend service to generate captions and images from LLMs
+Author: Avi Mehta
+Requires-Python: >=3.9
+Requires-Dist: flask>=2.3.0
+Requires-Dist: openai>=1.0.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: requests>=2.30.0
