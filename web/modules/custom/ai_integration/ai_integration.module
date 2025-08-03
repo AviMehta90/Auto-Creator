@@ -4,6 +4,7 @@ use Drupal\node\Entity\Node;
 use Drupal\media\Entity\Media;
 use Drupal\file\Entity\File;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\File\FileSystemInterface;
 
 /**
  * Implements hook_entity_insert().
@@ -47,12 +48,47 @@ function ai_integration_entity_insert(EntityInterface $entity) {
         throw new \Exception('Failed to download image from URL: ' . $image_url);
       }
 
-      $filename = basename($image_url);
-      $file_path = 'public://' . $filename;
+      // Validate image data
+      $image_info = getimagesizefromstring($image_data);
+      if ($image_info === false) {
+        throw new \Exception('Invalid image data received from AI service');
+      }
+
+      // Determine file extension based on image type
+      $extension = '';
+      switch ($image_info[2]) {
+        case IMAGETYPE_JPEG:
+          $extension = 'jpg';
+          break;
+        case IMAGETYPE_PNG:
+          $extension = 'png';
+          break;
+        case IMAGETYPE_GIF:
+          $extension = 'gif';
+          break;
+        default:
+          throw new \Exception('Unsupported image format. Only JPEG, PNG, and GIF are supported.');
+      }
+
+      $filename = 'ai_generated_' . time() . '.' . $extension;
+      $file_path = 'public://ai_images/' . $filename;
+      
+      // Ensure the ai_images directory exists
+      $directory = 'public://ai_images';
       $file_system = \Drupal::service('file_system');
+      if (!is_dir($file_system->realpath($directory))) {
+        $file_system->mkdir($directory, 0755, TRUE);
+      }
+      
       $saved_path = $file_system->saveData($image_data, $file_path, FileSystemInterface::EXISTS_RENAME);
 
-      $file = File::create(['uri' => $saved_path]);
+      // Create file entity with proper MIME type
+      $file = File::create([
+        'uri' => $saved_path,
+        'filename' => basename($saved_path),
+        'filemime' => 'image/' . $extension,
+        'status' => 1,
+      ]);
       $file->save();
 
       // Create Media entity for image
