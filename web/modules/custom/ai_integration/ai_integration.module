@@ -24,7 +24,7 @@ function ai_integration_entity_insert(EntityInterface $entity) {
     try {
       // Make HTTP POST request to Flask backend
       $client = \Drupal::httpClient();
-      $response = $client->post('http://host.docker.internal:5000/generate', [
+      $response = $client->post('http://host.docker.internal:5050/generate', [
         'json' => ['prompt' => $prompt_text],
         'headers' => ['Content-Type' => 'application/json'],
         'timeout' => 30, // increased timeout for long generation

@@ -1,7 +1,12 @@
 from flask import Flask, request, jsonify
 from openai_client import generate_caption_and_description, generate_image
+import os
 
 app = Flask(__name__)
+
+@app.route("/health", methods=["GET"])
+def health_check():
+    return jsonify({"status": "healthy", "service": "ai-service"})
 
 @app.route("/generate", methods=["POST", "GET"])
 def generate_ad():
@@ -29,5 +34,5 @@ def generate_ad():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True)
-
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)  # Changed debug=True to debug=False for production

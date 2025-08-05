@@ -1,0 +1,15 @@
+services:
+  ai-service:
+    build: ./ai_service
+    ports:
+      - "5050:5050"
+    env_file:
+      - ./ai_service/.env
+    volumes:
+      - ./ai_service:/app
+    networks:
+      - auto-creator-network
+
+networks:
+  auto-creator-network:
+    driver: bridge
